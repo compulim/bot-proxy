@@ -62,7 +62,7 @@ const server = http.createServer((req, res) => {
     res.end('ok');
   } else {
     res.statusCode = 404;
-    res.end(`route not found for ${ req.url }`);
+    res.end(`bot-proxy: route not found for ${ req.url }`);
     // proxy.web(req, res, {
     //   changeOrigin: true,
     //   target: BOT_PROXY_TARGET_URL,
