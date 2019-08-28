@@ -106,6 +106,7 @@ server.on('upgrade', async (res, socket, head) => {
   unsubscribes.push(ws.on('end', shutdown).destroy.bind(ws));
 
   const incomingServer = new Server(socket => {
+    console.log(`Accepting an incoming named pipe at ${ INCOMING_PIPE_NAME }.`);
     numIncomingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
     ws.on('binary', socket.write.bind(socket));
@@ -114,6 +115,7 @@ server.on('upgrade', async (res, socket, head) => {
   unsubscribes.push(incomingServer.close.bind(incomingServer));
 
   const outgoingServer = new Server(socket => {
+    console.log(`Accepting an outgoing named pipe at ${ OUTGOING_PIPE_NAME }.`);
     numOutgoingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
     socket.on('data', ws.send.bind(ws));
