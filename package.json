@@ -4,6 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
+    "start": "node-dev --no-notify --respawn .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "William Wong <compulim@hotmail.com> (http://compulim.info/)",
@@ -15,5 +16,8 @@
     "http-proxy": "^1.17.0",
     "pretty-ms": "^5.0.0",
     "watershed": "^0.4.0"
+  },
+  "devDependencies": {
+    "node-dev": "^4.0.0"
   }
 }

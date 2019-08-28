@@ -76,7 +76,9 @@ let ws;
 
 server.on('upgrade', async (res, socket, head) => {
   if (ws) {
-    socket.close();
+    console.log('Web Socket connection already established, cannot accept another one.');
+
+    return socket.destroy();
   }
 
   try {
@@ -90,33 +92,34 @@ server.on('upgrade', async (res, socket, head) => {
 
   numWebSockets++;
 
-  let resources = [];
+  let unsubscribes = [];
 
   const shutdown = () => {
     console.log('Shutting down the tunnel.');
 
     ws = null;
-    resources.forEach(resource => resource.close());
-    resources = null;
+
+    unsubscribes.forEach(unsubscribe => unsubscribe());
+    unsubscribes = null;
   };
 
-  resources.push(ws.on('end', shutdown));
+  unsubscribes.push(ws.on('end', shutdown).destroy.bind(ws));
 
-  resources.push(
-    new Server(socket => {
-      numIncomingNamedPipes++;
-      resources.push(socket);
-      ws.on('binary', socket.write.bind(socket));
-    }).on('error', shutdown).listen(INCOMING_PIPE_NAME)
-  );
+  const incomingServer = new Server(socket => {
+    numIncomingNamedPipes++;
+    unsubscribes.push(socket.destroy.bind(socket));
+    ws.on('binary', socket.write.bind(socket));
+  }).on('error', shutdown).listen(INCOMING_PIPE_NAME);
 
-  resources.push(
-    new Server(socket => {
-      numOutgoingNamedPipes++;
-      resources.push(socket);
-      socket.on('data', ws.send.bind(ws));
-    }).on('error', shutdown).listen(OUTGOING_PIPE_NAME)
-  );
+  unsubscribes.push(incomingServer.close.bind(incomingServer));
+
+  const outgoingServer = new Server(socket => {
+    numOutgoingNamedPipes++;
+    unsubscribes.push(socket.destroy.bind(socket));
+    socket.on('data', ws.send.bind(ws));
+  }).on('error', shutdown).listen(OUTGOING_PIPE_NAME);
+
+  unsubscribes.push(outgoingServer.close.bind(outgoingServer));
 });
 
 server.listen(PORT, () => console.log(`Bot proxy listening on port ${ PORT }.`));
