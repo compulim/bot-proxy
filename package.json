@@ -10,8 +10,10 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
+    "botframework-streaming-extensions": "^4.6.0-preview.76590",
     "dotenv": "^8.1.0",
     "http-proxy": "^1.17.0",
-    "pretty-ms": "^5.0.0"
+    "pretty-ms": "^5.0.0",
+    "watershed": "^0.4.0"
   }
 }
