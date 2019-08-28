@@ -104,7 +104,9 @@ server.on('upgrade', async (res, socket, head) => {
 
   let unsubscribes = [];
 
-  const shutdown = () => {
+  let shutdown = () => {
+    shutdown = null;
+
     console.log('Shutting down the tunnel.');
 
     ws = null;
@@ -119,7 +121,7 @@ server.on('upgrade', async (res, socket, head) => {
     console.log(`Accepting an incoming named pipe at ${ INCOMING_PIPE_NAME }.`);
     numIncomingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
-    ws.on('binary', socket.write.bind(socket));
+    socket.on('data', ws.send.bind(ws));
   }).on('error', shutdown).listen(INCOMING_PIPE_NAME);
 
   unsubscribes.push(incomingServer.close.bind(incomingServer));
@@ -128,7 +130,7 @@ server.on('upgrade', async (res, socket, head) => {
     console.log(`Accepting an outgoing named pipe at ${ OUTGOING_PIPE_NAME }.`);
     numOutgoingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
-    socket.on('data', ws.send.bind(ws));
+    ws.on('binary', socket.write.bind(socket));
   }).on('error', shutdown).listen(OUTGOING_PIPE_NAME);
 
   unsubscribes.push(outgoingServer.close.bind(outgoingServer));
