@@ -24,11 +24,12 @@ const {
 let numIncomingNamedPipes = 0;
 let numOutgoingNamedPipes = 0;
 let numWebSockets = 0;
+let webSocketUp = 0;
 const up = Date.now();
 
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
-    const message = `Bot Proxy is up since ${ prettyMs(Date.now() - up) } ago. ${ ws ? 'A client is connected.' : 'No client is connected.' }`;
+    const message = `Bot Proxy is up since ${ prettyMs(Date.now() - up) } ago. ${ ws ? `A client is connected ${ prettyMs(Date.now() - webSocketUp) } ago.` : 'No client is connected.' }`;
     const separator = new Array(message.length).fill('-').join('');
 
     res.setHeader('Content-Type', 'text/plain');
@@ -51,7 +52,8 @@ const server = http.createServer((req, res) => {
           }
         },
         webSockets: {
-          numConnections: numWebSockets
+          numConnections: numWebSockets,
+          up: new Date(webSocketUp).toISOString()
         },
         pipeName: PIPE_NAME,
         up: new Date(up).toISOString()
@@ -60,6 +62,13 @@ const server = http.createServer((req, res) => {
   } else if (req.url === '/health.txt') {
     res.setHeader('Content-Type', 'text/plain');
     res.end('ok');
+  } else if (req.url === '/kill') {
+    if (ws) {
+      console.log('Killing Web Socket connection.');
+      ws.destroy();
+    }
+  } else if (req.url === '/kill?force') {
+    process.exit(-1);
   } else {
     res.statusCode = 404;
     res.end(`bot-proxy: route not found for ${ req.url }`);
@@ -90,6 +99,7 @@ server.on('upgrade', async (res, socket, head) => {
 
   console.log('Accepted a Web Socket tunnel.');
 
+  webSocketUp = Date.now();
   numWebSockets++;
 
   let unsubscribes = [];
