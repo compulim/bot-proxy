@@ -121,7 +121,10 @@ server.on('upgrade', async (res, socket, head) => {
     console.log(`Accepting an incoming named pipe at ${ INCOMING_PIPE_NAME }.`);
     numIncomingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
-    socket.on('data', ws.send.bind(ws));
+    socket.on('data', buffer => {
+      console.log(`NP->WS: ${ buffer.toString() }`);
+      ws.send(buffer);
+    });
   }).on('error', shutdown).listen(INCOMING_PIPE_NAME);
 
   unsubscribes.push(incomingServer.close.bind(incomingServer));
@@ -130,7 +133,10 @@ server.on('upgrade', async (res, socket, head) => {
     console.log(`Accepting an outgoing named pipe at ${ OUTGOING_PIPE_NAME }.`);
     numOutgoingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
-    ws.on('binary', socket.write.bind(socket));
+    ws.on('binary', buffer => {
+      console.log(`WS->NP: ${ buffer.toString() }`);
+      socket.write(buffer);
+    });
   }).on('error', shutdown).listen(OUTGOING_PIPE_NAME);
 
   unsubscribes.push(outgoingServer.close.bind(outgoingServer));
