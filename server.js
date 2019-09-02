@@ -97,7 +97,7 @@ server.on('upgrade', async (res, socket, head) => {
     return socket.end();
   }
 
-  console.log('Accepted a Web Socket tunnel.');
+  console.log(`Accepted a Web Socket tunnel from ${ JSON.stringify(socket.address()) }.`);
 
   webSocketUp = Date.now();
   numWebSockets++;
