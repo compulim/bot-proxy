@@ -85,9 +85,9 @@ let ws;
 
 server.on('upgrade', async (res, socket, head) => {
   if (ws) {
-    console.log('Web Socket connection already established, cannot accept another one.');
+    console.log('Web Socket connection already established, killing existing one.');
 
-    return socket.destroy();
+    ws.destroy();
   }
 
   try {
@@ -103,13 +103,15 @@ server.on('upgrade', async (res, socket, head) => {
   numWebSockets++;
 
   let unsubscribes = [];
+  let closed;
 
   let shutdown = () => {
-    shutdown = null;
+    if (closed) { return; }
+
+    closed = true;
+    ws = null;
 
     console.log('Shutting down the tunnel.');
-
-    ws = null;
 
     unsubscribes.forEach(unsubscribe => unsubscribe());
     unsubscribes = null;
@@ -119,11 +121,19 @@ server.on('upgrade', async (res, socket, head) => {
 
   const incomingServer = new Server(socket => {
     console.log(`Accepting an incoming named pipe at ${ INCOMING_PIPE_NAME }.`);
+
     numIncomingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
+
     socket.on('data', buffer => {
-      console.log(`NP->WS: ${ buffer.toString() }`);
-      ws.send(buffer);
+      try {
+        console.log(`NP->WS: ${ buffer.toString() }`);
+        ws.send(buffer);
+      } catch (err) {
+        console.error('bot-proxy: failed when NP->WS');
+        console.error(err);
+        shutdown();
+      }
     });
   }).on('error', shutdown).listen(INCOMING_PIPE_NAME);
 
@@ -131,11 +141,19 @@ server.on('upgrade', async (res, socket, head) => {
 
   const outgoingServer = new Server(socket => {
     console.log(`Accepting an outgoing named pipe at ${ OUTGOING_PIPE_NAME }.`);
+
     numOutgoingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
+
     ws.on('binary', buffer => {
-      console.log(`WS->NP: ${ buffer.toString() }`);
-      socket.write(buffer);
+      try {
+        console.log(`WS->NP: ${ buffer.toString() }`);
+        socket.write(buffer);
+      } catch (err) {
+        console.error('bot-proxy: failed when WS->NP');
+        console.error(err);
+        shutdown();
+      }
     });
   }).on('error', shutdown).listen(OUTGOING_PIPE_NAME);
 
