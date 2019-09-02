@@ -1,10 +1,9 @@
 require('dotenv/config');
 
-const http = require('http');
-// const httpProxy = require('http-proxy');
-const prettyMs = require('pretty-ms');
-const { Watershed } = require('watershed');
 const { Server } = require('net');
+const http = require('http');
+const prettyMs = require('pretty-ms');
+const WebSocket = require('ws');
 
 const {
   PIPE_NAME = 'bfv4.pipes',
@@ -16,11 +15,6 @@ const {
   OUTGOING_PIPE_NAME = `\\\\.\\pipe\\${ PIPE_NAME }.outgoing`
 } = process.env;
 
-// const proxy = httpProxy.createProxyServer({});
-
-// proxy.on('proxyReq', (proxyReq, req, res, options) => {
-// });
-
 let numIncomingNamedPipes = 0;
 let numOutgoingNamedPipes = 0;
 let numWebSockets = 0;
@@ -29,7 +23,7 @@ const up = Date.now();
 
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
-    const message = `Bot Proxy is up since ${ prettyMs(Date.now() - up) } ago. ${ ws ? `A client is connected ${ prettyMs(Date.now() - webSocketUp) } ago.` : 'No client is connected.' }`;
+    const message = `Bot Proxy is up since ${ prettyMs(Date.now() - up) } ago. ${ shutdown ? `A client is connected ${ prettyMs(Date.now() - webSocketUp) } ago.` : 'No client is connected.' }`;
     const separator = new Array(message.length).fill('-').join('');
 
     res.setHeader('Content-Type', 'text/plain');
@@ -40,7 +34,7 @@ const server = http.createServer((req, res) => {
         separator
       ],
       computer: {
-        botConnected: !!ws,
+        botConnected: !!shutdown,
         namedPipe: {
           incoming: {
             name: INCOMING_PIPE_NAME,
@@ -63,9 +57,9 @@ const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'text/plain');
     res.end('ok');
   } else if (req.url === '/kill') {
-    if (ws) {
+    if (shutdown) {
       console.log('Killing Web Socket connection.');
-      ws.destroy();
+      shutdown();
     }
   } else if (req.url === '/kill?force') {
     process.exit(-1);
@@ -80,44 +74,35 @@ const server = http.createServer((req, res) => {
   }
 });
 
-const shed = new Watershed();
-let ws;
+const wss = new WebSocket.Server({ server });
 
-server.on('upgrade', async (res, socket, head) => {
-  if (ws) {
+let shutdown;
+
+wss.on('connection', ws => {
+  if (shutdown) {
     console.log('Web Socket connection already established, killing existing one.');
-
-    ws.destroy();
+    shutdown();
   }
 
-  try {
-    ws = shed.accept(res, socket, head);
-  } catch (err) {
-    console.error(err);
-    return socket.end();
-  }
-
-  console.log(`Accepted a Web Socket tunnel from ${ JSON.stringify(socket.address()) }.`);
+  console.log(`Accepted a Web Socket tunnel.`);
 
   webSocketUp = Date.now();
   numWebSockets++;
 
   let unsubscribes = [];
-  let closed;
 
-  let shutdown = () => {
-    if (closed) { return; }
+  shutdown = () => {
+    if (unsubscribes) {
+      console.log('Shutting down the tunnel.');
 
-    closed = true;
-    ws = null;
+      shutdown = null;
 
-    console.log('Shutting down the tunnel.');
-
-    unsubscribes.forEach(unsubscribe => unsubscribe());
-    unsubscribes = null;
+      unsubscribes.forEach(unsubscribe => unsubscribe());
+      unsubscribes = null;
+    }
   };
 
-  unsubscribes.push(ws.on('end', shutdown).destroy.bind(ws));
+  unsubscribes.push(ws.on('end', shutdown).close.bind(ws));
 
   const incomingServer = new Server(socket => {
     console.log(`Accepting an incoming named pipe at ${ INCOMING_PIPE_NAME }.`);
@@ -130,7 +115,7 @@ server.on('upgrade', async (res, socket, head) => {
         console.log(`NP->WS: ${ buffer.toString() }`);
         ws.send(buffer);
       } catch (err) {
-        console.error('bot-proxy: failed when NP->WS');
+        console.error('bot-proxy: failed when NP->WS.');
         console.error(err);
         shutdown();
       }
@@ -145,12 +130,12 @@ server.on('upgrade', async (res, socket, head) => {
     numOutgoingNamedPipes++;
     unsubscribes.push(socket.destroy.bind(socket));
 
-    ws.on('binary', buffer => {
+    ws.on('message', buffer => {
       try {
         console.log(`WS->NP: ${ buffer.toString() }`);
         socket.write(buffer);
       } catch (err) {
-        console.error('bot-proxy: failed when WS->NP');
+        console.error('bot-proxy: failed when WS->NP.');
         console.error(err);
         shutdown();
       }

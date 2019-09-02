@@ -15,7 +15,7 @@
     "dotenv": "^8.1.0",
     "http-proxy": "^1.17.0",
     "pretty-ms": "^5.0.0",
-    "watershed": "^0.4.0"
+    "ws": "^7.1.2"
   },
   "devDependencies": {
     "node-dev": "^4.0.0"
