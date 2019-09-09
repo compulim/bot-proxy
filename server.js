@@ -2,11 +2,12 @@ require('dotenv/config');
 
 const { Server } = require('net');
 const http = require('http');
-const httpProxy = require('http-proxy');
+const { createProxyServer } = require('http-proxy');
 const prettyMs = require('pretty-ms');
 const WebSocket = require('ws');
 
 const {
+  BOT_PROXY_TARGET_URL,
   PIPE_NAME = 'bfv4.pipes',
   PORT = 80
 } = process.env;
@@ -21,6 +22,7 @@ let numOutgoingNamedPipes = 0;
 let numWebSockets = 0;
 let webSocketUp = 0;
 const up = Date.now();
+const proxy = createProxyServer();
 
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
@@ -46,6 +48,7 @@ const server = http.createServer((req, res) => {
             numConnections: numOutgoingNamedPipes
           }
         },
+        proxy: BOT_PROXY_TARGET_URL,
         webSockets: {
           numConnections: numWebSockets,
           up: new Date(webSocketUp).toISOString()
@@ -64,6 +67,13 @@ const server = http.createServer((req, res) => {
     }
   } else if (req.url === '/kill?force') {
     process.exit(-1);
+  } else if (/^\/api\/messages/.test(req.url)) {
+    console.log(`Proxying bot requests to ${ BOT_PROXY_TARGET_URL }`);
+
+    proxy.web(req, res, {
+      changeOrigin: true,
+      target: BOT_PROXY_TARGET_URL
+    });
   } else {
     res.statusCode = 404;
     res.end(`bot-proxy: route not found for ${ req.url }`);
