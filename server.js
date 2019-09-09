@@ -2,6 +2,7 @@ require('dotenv/config');
 
 const { Server } = require('net');
 const http = require('http');
+const httpProxy = require('http-proxy');
 const prettyMs = require('pretty-ms');
 const WebSocket = require('ws');
 
@@ -74,7 +75,11 @@ const server = http.createServer((req, res) => {
   }
 });
 
-const wss = new WebSocket.Server({ server });
+server.on('upgrade', (req, socket, head) => {
+  wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+});
+
+const wss = new WebSocket.Server({ noServer: true });
 
 let shutdown;
 
